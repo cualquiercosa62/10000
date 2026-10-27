@@ -4,7 +4,7 @@
    Five of the same number in one roll wins the game. No straights. No minimum to open. */
 (function(){
 const GOAL=10000;
-const HOLD_BANK=3000,HOLD_BUST=5000; // how long everyone sees how a turn ended before the next roll
+const HOLD_BANK=3000,HOLD_BUST=5000,KEEP_PAUSE=2000; // how long everyone sees how a turn ended before the next roll
 const counts=v=>{const c=[0,0,0,0,0,0,0];v.forEach(d=>c[d]++);return c};
 
 // Points for a set of dice the player keeps from one roll. valid=false if any kept die does not score.
@@ -34,7 +34,7 @@ const rollDice=n=>Array.from({length:n},()=>1+Math.floor(Math.random()*6));
 
 function startTurn(s){
   const p=s.order[s.turnIdx];
-  s.turn={pid:p,total:0,kept:[],roll:null,left:5,phase:'start'};
+  s.turn={pid:p,total:0,kept:[],roll:null,left:5,phase:'start',cycle:0};
 }
 function newGame(s){
   s.scores={};s.order.forEach(p=>s.scores[p]=0);
@@ -52,7 +52,7 @@ function doRoll(s,p){
   const r=rollDice(t.left);t.roll=r;
   if(fiveSame(r)){s.last={kind:'five',pid:p,roll:r};win(s,p,`with five ${r[0]}s in one roll`);return null}
   if(!rollScores(r)){
-    s.last={kind:'bust',pid:p,roll:r,lost:t.total,kept:t.kept};s.holdUntil=Date.now()+HOLD_BUST;
+    s.last={kind:'bust',pid:p,roll:r,lost:t.total,kept:t.kept,cycle:t.cycle||0};s.holdUntil=Date.now()+HOLD_BUST;
     addLog(s,`${nm(s,p)} rolled ${r.join(' ')}: nothing scores${t.total?`, and loses ${t.total} points`:''}.`);
     endTurn(s);return null;
   }
@@ -67,23 +67,31 @@ function keep(s,p,idx,then){
   if(!idx.length)return 'Pick at least one die that scores.';
   const vals=idx.map(i=>t.roll[i]);const sc=scoreKeep(vals);
   if(!sc.valid)return 'Every die you keep has to score: 1s, 5s, or three of a kind.';
-  t.total+=sc.points;t.kept.push({dice:vals,points:sc.points});t.left-=vals.length;t.roll=null;t.phase='start';
-  const hot=t.left===0;if(hot)t.left=5;
+  t.total+=sc.points;t.kept.push({dice:vals,points:sc.points,cycle:t.cycle||0});t.left-=vals.length;t.roll=null;t.phase='start';
+  const hot=t.left===0;if(hot){t.left=5;t.cycle=(t.cycle||0)+1}
   const sum=s.scores[p]+t.total;
   if(s.opts.finish==='exact'&&sum>GOAL){
-    s.last={kind:'over',pid:p,lost:t.total,kept:t.kept};s.holdUntil=Date.now()+HOLD_BUST;
+    s.last={kind:'over',pid:p,lost:t.total,kept:t.kept,cycle:t.kept.length?t.kept[t.kept.length-1].cycle:0};s.holdUntil=Date.now()+HOLD_BUST;
     addLog(s,`${nm(s,p)} went over ${GOAL} and loses ${t.total} points.`);endTurn(s);return null;
   }
   if(then==='stop'||sum===GOAL||(s.opts.finish!=='exact'&&sum>=GOAL)){
-    s.scores[p]=sum;s.last={kind:'bank',pid:p,points:t.total,kept:t.kept};s.holdUntil=Date.now()+HOLD_BANK;
+    s.scores[p]=sum;s.last={kind:'bank',pid:p,points:t.total,kept:t.kept,cycle:t.kept.length?t.kept[t.kept.length-1].cycle:0};s.holdUntil=Date.now()+HOLD_BANK;
     addLog(s,`${nm(s,p)} scores ${t.total} (total ${sum}).`);
     if(sum>=GOAL){win(s,p,`with ${sum}`);return null}
     endTurn(s);return null;
   }
   if(hot)addLog(s,`${nm(s,p)} scored with all five dice and rolls all five again.`);
-  return doRoll(s,p);
+  // Pause so everyone sees the kept dice move up before the rest are rolled.
+  t.phase='pending';t.rollAt=Date.now()+KEEP_PAUSE;
+  return null;
+}
+function rollPending(s){
+  const t=s.turn;
+  if(s.status!=='playing'||!t||t.phase!=='pending')return 'Nothing to roll.';
+  t.phase='start';t.rollAt=null;
+  return doRoll(s,t.pid);
 }
 
-const API={GOAL,scoreKeep,fiveSame,rollScores,bestKeep,nm,addLog,newGame,startTurn,endTurn,doRoll,keep,counts};
+const API={rollPending,KEEP_PAUSE,GOAL,scoreKeep,fiveSame,rollScores,bestKeep,nm,addLog,newGame,startTurn,endTurn,doRoll,keep,counts};
 if(typeof module!=='undefined')module.exports=API;else window.DiezMil=API;
 })();

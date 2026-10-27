@@ -93,6 +93,15 @@ function changed(code, s) {
   if (s.last && !s.last.rev) s.last.rev = s.rev;
   broadcast(code);
   bots.schedule(code, s);
+  // Kept dice wait a moment on screen, then the rest are rolled.
+  if (s.status === 'playing' && s.turn && s.turn.phase === 'pending') {
+    const rev = s.rev;
+    setTimeout(() => {
+      const g = games.get(code);
+      if (!g || g.rev !== rev) return;
+      if (!R.rollPending(g)) changed(code, g);
+    }, Math.max(0, s.turn.rollAt - Date.now()));
+  }
 }
 const bots = BOT.makeScheduler((code, pid, fn) => {
   const s = games.get(code);

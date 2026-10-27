@@ -92,6 +92,25 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .who.big{font-size:1.3rem}.who.big b{color:var(--gold)}
 .bigpts{font-family:var(--display);font-weight:800;font-size:clamp(3rem,12vw,4.5rem);line-height:1;font-variant-numeric:tabular-nums}
 .bigpts.good{color:var(--gold)}.bigpts.bad{color:var(--danger)}
+.kgrp.newk{box-shadow:0 0 0 2px var(--gold);background:rgba(233,185,73,.12)}
+.strip{--d:72px;--g:10px;width:min(100%, calc(5*var(--d) + 4*var(--g) + 44px));display:flex;flex-direction:column;gap:10px}
+.srow{display:flex;justify-content:space-between;align-items:center}
+.zone .dice{display:flex;gap:var(--g);flex-wrap:nowrap;min-height:0}
+.zone.keep{padding:6px;border-radius:14px;background:rgba(233,185,73,.10);box-shadow:0 0 0 1.5px rgba(233,185,73,.55);min-height:calc(var(--d) + 12px)}
+.zone.keep:has(.dice:empty){background:transparent;box-shadow:none;outline:1.5px dashed rgba(233,185,73,.3);outline-offset:-1px}
+.strip .die{width:var(--d);height:var(--d)}
+.caps{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.cap{font-size:.95rem;color:var(--ink-dim);text-align:left}
+.cap.pts{text-align:right;margin-left:auto}
+.cap b{color:var(--gold)}
+.kslot{display:inline-flex}
+.kslot.newk .die{box-shadow:0 0 0 3px var(--gold),0 6px 14px rgba(0,0,0,.4)}
+.kslot.lost .die{opacity:.45}
+.die.ghost{opacity:.16;cursor:default;box-shadow:none}
+.cap .tp{font-size:1.9rem;line-height:1.1}
+.cap .bigpts{font-size:clamp(2.4rem,9vw,3.4rem)}
+@media (max-width:520px){.strip{--d:58px;--g:7px}}
+@media (max-width:440px){.strip{--d:48px;--g:5px}.strip .die{padding:7px;border-radius:9px}.strip .die .p{width:8px;height:8px}.strip .die.one .p{width:11px;height:11px}}
 .nokept{min-height:58px;display:flex;align-items:center;color:var(--ink-dim);font-size:.9rem}
 .kept.lost .kgrp{opacity:.45}.kept.lost .kgrp span{text-decoration:line-through}
 .log{max-height:200px;overflow:auto;font-size:.9rem;color:var(--ink-dim);display:flex;flex-direction:column;gap:4px;margin:8px 0 0;padding:0;list-style:none}
@@ -243,39 +262,58 @@ function renderGame(){
   }else{
     const L=s.last;
     const holding=L&&['bank','bust','over'].includes(L.kind)&&holdEnd>Date.now()&&t.phase==='start'&&!t.kept.length;
-    const kept=(t.kept||[]).map(k=>`<div class="kgrp"><div class="row">${k.dice.map(v=>dieHTML(v,{sm:true,dis:true})).join('')}</div><span>${fmt(k.points)}</span></div>`).join('');
-    let dice='',info='',buttons='';
-    if(t.phase==='choose'&&t.roll){
-      dice=`<div class="dice ${animate?'rolling':''}">${t.roll.map((v,i)=>dieHTML(v,{i,sel:sel.has(i),dis:!myTurn})).join('')}</div>`;
-      if(myTurn){
-        const vals=[...sel].map(i=>t.roll[i]),sc=R.scoreKeep(vals);
-        const ok=sel.size>0&&sc.valid;
-        let left=t.left-sel.size;const hot=left===0;if(hot)left=5;
-        const after=t.total+(ok?sc.points:0),sum=(s.scores[pid]||0)+after;
-        const over=s.opts.finish==='exact'&&sum>R.GOAL;
-        info=!sel.size?'Tap the dice you want to keep.':!sc.valid?'<span class="bad">Every die you keep has to score.</span>':`Keeping <b>${fmt(sc.points)}</b> · turn total <b>${fmt(after)}</b>${over?' · <span class="bad">that goes over 10.000</span>':''}`;
-        buttons=`<div class="actions"><button class="btn big" data-act="keep-roll" ${ok?'':'disabled'}>${hot?'Keep and roll all 5 again':`Keep and roll ${left}`}</button><button class="btn ghost big" data-act="keep-stop" ${ok?'':'disabled'}>Keep and stop${ok?` (+${fmt(after)})`:''}</button></div>
-          <div class="actions"><button class="btn small ghost" data-act="pickall">Pick all scoring dice</button></div>`;
-      }else info=`<b>${esc(nm(t.pid))}</b> is choosing which dice to keep…`;
-    }else{
-      dice=`<div class="dice">${Array.from({length:t.left||5},()=>'<span class="die" style="opacity:.18;cursor:default" aria-hidden="true"></span>').join('')}</div>`;
-      if(myTurn)buttons=`<div class="actions"><button class="btn big" data-act="roll">Roll ${t.left===5?'5 dice':t.left+' dice'}</button></div>`;
-      else info=`Waiting for <b>${esc(nm(t.pid))}</b> to roll…`;
-    }
-    const grp=(k,cls)=>`<div class="kgrp ${cls||''}"><div class="row">${k.dice.map(v=>dieHTML(v,{dis:true})).join('')}</div><span>${fmt(k.points)}</span></div>`;
+    // One row of five dice: dice still in play on the left, kept dice on the right (highlighted), points under the kept dice.
+    // After all five dice scored and were rolled again, earlier kept dice are summed up instead of shown.
+    const ghost='<span class="die ghost" aria-hidden="true"></span>';
+    const strip=(liveHTML,keptGroups,cyc,ptsHTML,liveCap,o={})=>{
+      const shown=keptGroups.filter(k=>(k.cycle||0)===cyc);
+      const earlier=keptGroups.filter(k=>(k.cycle||0)<cyc).reduce((a,k)=>a+k.points,0);
+      const keptDice=shown.map((k,gi)=>k.dice.map(v=>`<span class="kslot${o.newLast&&gi===shown.length-1?' newk':''}${o.lost?' lost':''}">${dieHTML(v,{dis:true})}</span>`).join('')).join('');
+      return `<div class="strip"><div class="srow"><div class="zone live"><div class="dice${animate&&o.anim?' rolling':''}">${liveHTML}</div></div>
+        <div class="zone keep"><div class="dice">${keptDice}</div></div></div>
+        <div class="caps"><div class="cap">${liveCap||''}</div><div class="cap pts">${ptsHTML}${earlier?`<div class="note">includes ${fmt(earlier)} from earlier dice</div>`:''}</div></div></div>`;
+    };
+    let tray2='';
+    let info='',buttons='';
     if(holding){
-      const W=`<b>${esc(nm(L.pid))}</b>`,ks=(L.kept||[]);
-      if(L.kind==='bank')tray=`<section class="tray"><div class="who big">${W} stopped</div>
-        <div class="eyebrow">Kept this turn</div><div class="kept">${ks.map(k=>grp(k)).join('')}</div>
-        <div class="bigpts good">+${fmt(L.points)}</div><div class="note">points this turn</div></section>`;
-      else tray=`<section class="tray"><div class="who big">${W} ${L.kind==='bust'?'rolled nothing that scores':'went over 10.000'}</div>
-        <div class="eyebrow">Kept this turn</div><div class="kept lost">${ks.length?ks.map(k=>grp(k)).join(''):'<div class="nokept">Nothing kept</div>'}</div>
-        ${L.roll?`<div class="eyebrow">Last roll</div><div class="dice ${animate?'rolling':''}">${L.roll.map(v=>dieHTML(v,{dis:true})).join('')}</div>`:''}
-        <div class="bigpts bad">0</div><div class="note">points this turn${L.lost?` · ${fmt(L.lost)} lost`:''}</div></section>`;
-    }else tray=`<section class="tray">
-      <div class="turnhead"><div class="who">${myTurn?'<b>Your turn</b>':`<b>${esc(nm(t.pid))}</b>'s turn`}</div><div class="tp"><small>Turn points</small>${fmt(t.total)}</div></div>
-      <div class="eyebrow">Kept this turn</div><div class="kept">${kept||'<div class="nokept">Nothing kept yet</div>'}</div>
-      ${t.phase==='choose'&&t.roll?'<div class="eyebrow">Rolled</div>':''}${dice}<div class="selinfo">${info}</div>${buttons}</section>`;
+      const W=`<b>${esc(nm(L.pid))}</b>`,ks=L.kept||[],cyc=L.cycle||0;
+      const keptN=ks.filter(k=>(k.cycle||0)===cyc).reduce((n,k)=>n+k.dice.length,0);
+      if(L.kind==='bank'){
+        tray2=`<section class="tray"><div class="who big">${W} stopped</div>
+          ${strip(Array.from({length:5-keptN},()=>ghost).join(''),ks,cyc,`<div class="bigpts good">+${fmt(L.points)}</div>`,'')}</section>`;
+      }else{
+        const live=L.roll?L.roll.map(v=>dieHTML(v,{dis:true})).join(''):Array.from({length:5-keptN},()=>ghost).join('');
+        tray2=`<section class="tray"><div class="who big">${W} ${L.kind==='bust'?'rolled nothing that scores':'went over 10.000'}</div>
+          ${strip(live,ks,cyc,`<div class="bigpts bad">0</div>${L.lost?`<div class="note">${fmt(L.lost)} lost</div>`:''}`,L.kind==='bust'?'Nothing scores':'',{lost:true,anim:true})}</section>`;
+      }
+    }else{
+      const ks=t.kept||[],lastG=ks[ks.length-1];
+      const cyc=t.phase==='pending'&&lastG&&(lastG.cycle||0)!==(t.cycle||0)?lastG.cycle:(t.cycle||0);
+      const keptN=ks.filter(k=>(k.cycle||0)===cyc).reduce((n,k)=>n+k.dice.length,0);
+      let live,cap='';
+      if(t.phase==='choose'&&t.roll){
+        live=t.roll.map((v,i)=>dieHTML(v,{i,sel:sel.has(i),dis:!myTurn})).join('');
+        if(myTurn){
+          const vals=[...sel].map(i=>t.roll[i]),sc=R.scoreKeep(vals);
+          const ok=sel.size>0&&sc.valid;
+          let left=t.left-sel.size;const hot=left===0;if(hot)left=5;
+          const after=t.total+(ok?sc.points:0),sum=(s.scores[pid]||0)+after;
+          const over=s.opts.finish==='exact'&&sum>R.GOAL;
+          cap=!sel.size?'Tap the dice to keep':!sc.valid?'<span class="bad">Every die you keep has to score</span>':`Keeping <b>${fmt(sc.points)}</b>${over?' · <span class="bad">goes over 10.000</span>':''}`;
+          buttons=`<div class="actions"><button class="btn big" data-act="keep-roll" ${ok?'':'disabled'}>${hot?'Keep and roll all 5 again':`Keep and roll ${left}`}</button><button class="btn ghost big" data-act="keep-stop" ${ok?'':'disabled'}>Keep and stop${ok?` (+${fmt(after)})`:''}</button></div>
+            <div class="actions"><button class="btn small ghost" data-act="pickall">Pick all scoring dice</button></div>`;
+        }else cap=`${esc(nm(t.pid))} is choosing…`;
+      }else{
+        live=Array.from({length:5-keptN},()=>ghost).join('');
+        if(t.phase==='pending')cap=`Rolling ${5-keptN===0?'all 5 again':(5-keptN)+(5-keptN===1?' die':' dice')}…`;
+        else if(myTurn)buttons=`<div class="actions"><button class="btn big" data-act="roll">Roll ${t.left===5?'5 dice':t.left+' dice'}</button></div>`;
+        else cap=`Waiting for ${esc(nm(t.pid))} to roll…`;
+      }
+      tray2=`<section class="tray"><div class="who big">${myTurn?'<b>Your turn</b>':`<b>${esc(nm(t.pid))}</b>'s turn`}</div>
+        ${strip(live,ks,cyc,`<div class="tp"><small>Turn points</small>${fmt(t.total)}</div>`,cap,{newLast:t.phase==='pending',anim:true})}
+        ${buttons}</section>`;
+    }
+    tray=tray2;
   }
   app.innerHTML=`<div class="topbar"><div><div class="eyebrow">Table <span class="code">${esc(s.code)}</span> · ${finishText(s.opts)}</div><h2>Diez Mil</h2></div><div class="row">${back}</div></div>
   <div class="board">${board}</div>
