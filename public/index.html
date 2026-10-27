@@ -58,7 +58,7 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .pl.turn{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
 .pl .nm{display:flex;justify-content:space-between;gap:8px;align-items:baseline;min-width:0}
 .pl .nm span:first-child{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pl .score{font-family:var(--display);font-weight:800;font-size:1.5rem;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1}
+.pl .score{font-family:var(--display);font-weight:800;font-size:2.4rem;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1}
 .bar{height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
 .bar i{display:block;height:100%;background:var(--gold)}
 
@@ -67,7 +67,7 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .turnhead{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;align-items:baseline}
 .turnhead .who{font-size:1.15rem}
 .turnhead .who b{color:var(--gold)}
-.tp{font-family:var(--display);font-weight:800;font-size:1.6rem;font-variant-numeric:tabular-nums}
+.tp{font-family:var(--display);font-weight:800;font-size:2.1rem;font-variant-numeric:tabular-nums}
 .tp small{font-family:var(--body);font-weight:500;font-size:.8rem;color:var(--ink-dim);letter-spacing:.1em;text-transform:uppercase;margin-right:6px}
 .dice{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;min-height:84px;align-items:center}
 .die{width:72px;height:72px;border-radius:14px;background:var(--die);border:1px solid var(--die-edge);box-shadow:0 3px 0 #b9ab92,0 8px 16px rgba(0,0,0,.4);display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:11px;cursor:pointer;transition:transform .15s ease, box-shadow .15s ease;font:inherit;flex:none}
@@ -89,10 +89,10 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .selinfo b{color:var(--gold)}
 .selinfo .bad{color:var(--danger)}
 .actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-.event{padding:10px 14px;border-radius:12px;background:rgba(0,0,0,.3);border:1px solid var(--tray-line);display:flex;flex-direction:column;gap:8px;align-items:center}
-.event.bust{border-color:var(--danger)}
-.event.good{border-color:var(--gold-deep)}
-.event .row{gap:6px;justify-content:center}
+.who.big{font-size:1.3rem}.who.big b{color:var(--gold)}
+.bigpts{font-family:var(--display);font-weight:800;font-size:clamp(3rem,12vw,4.5rem);line-height:1;font-variant-numeric:tabular-nums}
+.bigpts.good{color:var(--gold)}.bigpts.bad{color:var(--danger)}
+.kept.lost .kgrp{opacity:.45}.kept.lost .kgrp span{text-decoration:line-through}
 .log{max-height:200px;overflow:auto;font-size:.9rem;color:var(--ink-dim);display:flex;flex-direction:column;gap:4px;margin:8px 0 0;padding:0;list-style:none}
 .log li:first-child{color:var(--ink)}
 details summary{cursor:pointer;font-family:var(--display);font-weight:700;font-size:1.1rem}
@@ -118,7 +118,7 @@ function unstore(k){try{localStorage.removeItem(k)}catch(e){}}
 let pid=load('dm.pid');if(!pid){pid='p'+Math.random().toString(36).slice(2,12);store('dm.pid',pid)}
 let myName=load('dm.name')||load('escoba.name')||'';
 let offline=false,ready=false,view='lobby',code=null,game=null,es=null,openGames=[];
-let sel=new Set(),busy=false,lastRollKey='',animate=false;
+let sel=new Set(),busy=false,lastRollKey='',animate=false,holdEnd=0,holdRev=-1;
 const fmt=n=>Number(n||0).toLocaleString('es-AR');
 
 function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,3000)}
@@ -154,6 +154,11 @@ function openGame(c,quiet){
     animate=false;
     if(key&&key!==lastRollKey){animate=true;sel.clear();lastRollKey=key}
     if(!roll)sel.clear();
+    // Keep showing how a turn ended for a few seconds (the server holds the next roll as long).
+    if(s.last&&s.last.rev===s.rev&&s.holdUntil&&holdRev!==s.rev){
+      holdRev=s.rev;holdEnd=Date.now()+Math.max(0,s.holdUntil-s.updatedAt);
+      clearTimeout(openGame.h);openGame.h=setTimeout(()=>{if(view==='game')render()},holdEnd-Date.now()+50);
+    }
     if(view==='game')render();
   };
   es.onerror=()=>{if(!got){es.close();es=null;if(!quiet)toast(`No table with code ${c}.`);leave()}};
@@ -178,6 +183,7 @@ const RULES=`<details class="panel"><summary>How to play</summary><ul>
 <li>A <b>1</b> is worth 100 and a <b>5</b> is worth 50. Three of a kind in the same roll: three 1s = 1.000, three of any other number = that number × 100 (three 4s = 400). A 4th or 5th die of that number only adds if it is a 1 or a 5.</li>
 <li><b>Five of the same number in one roll wins the game.</b> Straights don't count.</li>
 <li>Every die you keep must score. If a roll has nothing that scores, you lose all the points from that turn.</li>
+<li>When a turn ends, everyone sees the dice and the points for a few seconds (3 seconds after stopping, 5 after rolling nothing) before the next player can roll.</li>
 <li>If all five dice score, you can roll all five again and keep adding, or stop and bank what you have.</li>
 <li>The table decides how the game ends: land on exactly 10.000 (going over loses that turn's points), or be the first to reach 10.000.</li>
 <li>Computer players can join any table. Easy ones play cautiously. Hard ones weigh the odds on every roll.</li></ul></details>`;
@@ -234,14 +240,8 @@ function renderGame(){
       ${L&&L.kind==='five'?`<div class="dice">${L.roll.map(v=>dieHTML(v,{dis:true})).join('')}</div><div>Five ${L.roll[0]}s in one roll.</div>`:`<div>${fmt(s.scores[s.winner])} points.</div>`}
       <div class="actions"><button class="btn big" data-act="rematch" ${s.order.includes(pid)?'':'disabled'}>Play again, same table</button></div></section>`;
   }else{
-    // How the previous turn ended, shown until the new player rolls.
-    let event='';
     const L=s.last;
-    if(L&&t.phase==='start'&&!t.kept.length&&L.pid!==t.pid){
-      if(L.kind==='bust')event=`<div class="event bust"><div><b>${esc(nm(L.pid))}</b> rolled nothing that scores${L.lost?` and lost ${fmt(L.lost)} points`:''}.</div><div class="dice ${animate?'rolling':''}">${L.roll.map(v=>dieHTML(v,{dis:true,sm:true})).join('')}</div></div>`;
-      else if(L.kind==='over')event=`<div class="event bust"><div><b>${esc(nm(L.pid))}</b> went over 10.000 and lost ${fmt(L.lost)} points.</div></div>`;
-      else if(L.kind==='bank')event=`<div class="event good"><div><b>${esc(nm(L.pid))}</b> stopped and scored <b>${fmt(L.points)}</b>.</div></div>`;
-    }
+    const holding=L&&['bank','bust','over'].includes(L.kind)&&holdEnd>Date.now()&&t.phase==='start'&&!t.kept.length;
     const kept=(t.kept||[]).map(k=>`<div class="kgrp"><div class="row">${k.dice.map(v=>dieHTML(v,{sm:true,dis:true})).join('')}</div><span>${fmt(k.points)}</span></div>`).join('');
     let dice='',info='',buttons='';
     if(t.phase==='choose'&&t.roll){
@@ -261,7 +261,17 @@ function renderGame(){
       if(myTurn)buttons=`<div class="actions"><button class="btn big" data-act="roll">Roll ${t.left===5?'5 dice':t.left+' dice'}</button></div>`;
       else info=`Waiting for <b>${esc(nm(t.pid))}</b> to roll…`;
     }
-    tray=`<section class="tray">${event}
+    const grp=(k,cls)=>`<div class="kgrp ${cls||''}"><div class="row">${k.dice.map(v=>dieHTML(v,{dis:true})).join('')}</div><span>${fmt(k.points)}</span></div>`;
+    if(holding){
+      const W=`<b>${esc(nm(L.pid))}</b>`,ks=(L.kept||[]);
+      if(L.kind==='bank')tray=`<section class="tray"><div class="who big">${W} stopped</div>
+        <div class="kept">${ks.map(k=>grp(k)).join('')}</div>
+        <div class="bigpts good">+${fmt(L.points)}</div><div class="note">points this turn</div></section>`;
+      else tray=`<section class="tray"><div class="who big">${W} ${L.kind==='bust'?'rolled nothing that scores':'went over 10.000'}</div>
+        ${L.roll?`<div class="dice ${animate?'rolling':''}">${L.roll.map(v=>dieHTML(v,{dis:true})).join('')}</div>`:''}
+        ${ks.length?`<div class="kept lost">${ks.map(k=>grp(k)).join('')}</div>`:''}
+        <div class="bigpts bad">0</div><div class="note">points this turn${L.lost?` · ${fmt(L.lost)} lost`:''}</div></section>`;
+    }else tray=`<section class="tray">
       <div class="turnhead"><div class="who">${myTurn?'<b>Your turn</b>':`<b>${esc(nm(t.pid))}</b>'s turn`}</div><div class="tp"><small>Turn points</small>${fmt(t.total)}</div></div>
       ${kept?`<div class="kept">${kept}</div>`:''}
       ${dice}<div class="selinfo">${info}</div>${buttons}</section>`;

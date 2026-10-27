@@ -4,6 +4,7 @@
    Five of the same number in one roll wins the game. No straights. No minimum to open. */
 (function(){
 const GOAL=10000;
+const HOLD_BANK=3000,HOLD_BUST=5000; // how long everyone sees how a turn ended before the next roll
 const counts=v=>{const c=[0,0,0,0,0,0,0];v.forEach(d=>c[d]++);return c};
 
 // Points for a set of dice the player keeps from one roll. valid=false if any kept die does not score.
@@ -37,7 +38,7 @@ function startTurn(s){
 }
 function newGame(s){
   s.scores={};s.order.forEach(p=>s.scores[p]=0);
-  s.turnIdx=Math.floor(Math.random()*s.order.length);s.status='playing';s.winner=null;s.log=[];s.last=null;s.round=1;
+  s.turnIdx=Math.floor(Math.random()*s.order.length);s.status='playing';s.holdUntil=0;s.winner=null;s.log=[];s.last=null;s.round=1;
   startTurn(s);addLog(s,`${nm(s,s.order[s.turnIdx])} starts.`);
 }
 function endTurn(s){s.turnIdx=(s.turnIdx+1)%s.order.length;startTurn(s)}
@@ -47,10 +48,11 @@ function doRoll(s,p){
   const t=s.turn;
   if(s.status!=='playing'||!t||t.pid!==p)return 'Not your turn.';
   if(t.phase!=='start')return 'Choose which dice to keep first.';
+  if(s.holdUntil&&Date.now()<s.holdUntil)return 'One moment, everyone is looking at the last turn.';
   const r=rollDice(t.left);t.roll=r;
   if(fiveSame(r)){s.last={kind:'five',pid:p,roll:r};win(s,p,`with five ${r[0]}s in one roll`);return null}
   if(!rollScores(r)){
-    s.last={kind:'bust',pid:p,roll:r,lost:t.total};
+    s.last={kind:'bust',pid:p,roll:r,lost:t.total,kept:t.kept};s.holdUntil=Date.now()+HOLD_BUST;
     addLog(s,`${nm(s,p)} rolled ${r.join(' ')}: nothing scores${t.total?`, and loses ${t.total} points`:''}.`);
     endTurn(s);return null;
   }
@@ -69,11 +71,11 @@ function keep(s,p,idx,then){
   const hot=t.left===0;if(hot)t.left=5;
   const sum=s.scores[p]+t.total;
   if(s.opts.finish==='exact'&&sum>GOAL){
-    s.last={kind:'over',pid:p,lost:t.total};
+    s.last={kind:'over',pid:p,lost:t.total,kept:t.kept};s.holdUntil=Date.now()+HOLD_BUST;
     addLog(s,`${nm(s,p)} went over ${GOAL} and loses ${t.total} points.`);endTurn(s);return null;
   }
   if(then==='stop'||sum===GOAL||(s.opts.finish!=='exact'&&sum>=GOAL)){
-    s.scores[p]=sum;s.last={kind:'bank',pid:p,points:t.total};
+    s.scores[p]=sum;s.last={kind:'bank',pid:p,points:t.total,kept:t.kept};s.holdUntil=Date.now()+HOLD_BANK;
     addLog(s,`${nm(s,p)} scores ${t.total} (total ${sum}).`);
     if(sum>=GOAL){win(s,p,`with ${sum}`);return null}
     endTurn(s);return null;

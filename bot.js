@@ -72,7 +72,7 @@ function makeScheduler(commit) {
     if (!s || s.status !== 'playing' || !s.turn) return;
     const p = s.turn.pid;
     if (!isBot(s, p)) return;
-    const pause = s.last && s.last.rev === s.rev && s.turn.phase === 'start' && !s.turn.kept.length ? 1800 : 0; // let people see how the last turn ended
+    const pause = Math.max(0, (s.holdUntil || 0) - Date.now()); // wait while everyone sees how the last turn ended
     if (s.turn.phase === 'start') {
       timers.set(code, setTimeout(() => commit(code, p, g => R.doRoll(g, p)), pause + rand(1200, 1900)));
     } else {
