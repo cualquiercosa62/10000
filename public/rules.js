@@ -28,6 +28,8 @@ function bestKeep(vals){
   return out;
 }
 
+// Optional opening threshold: until a player banks a turn of at least this many points, nothing counts.
+const isOpen=(s,p)=>!(s.opts&&s.opts.open)||!!(s.opened&&s.opened[p]);
 const nm=(s,p)=>s.players[p]?.name||'Someone';
 function addLog(s,t){s.log=[t,...(s.log||[])].slice(0,40)}
 const rollDice=n=>Array.from({length:n},()=>1+Math.floor(Math.random()*6));
@@ -38,7 +40,7 @@ function startTurn(s,idle){
   s.turn={pid:p,total:0,kept:[],roll:null,left:5,phase:'start',cycle:0,idle:(idle&&idle.length===5)?idle:rollDice(5)};
 }
 function newGame(s){
-  s.scores={};s.order.forEach(p=>s.scores[p]=0);
+  s.scores={};s.opened={};s.order.forEach(p=>s.scores[p]=0);
   s.turnIdx=Math.floor(Math.random()*s.order.length);s.status='playing';s.holdUntil=0;s.winner=null;s.log=[];s.last=null;s.round=1;
   startTurn(s);addLog(s,`${nm(s,s.order[s.turnIdx])} starts.`);
 }
@@ -72,6 +74,7 @@ function keep(s,p,idx,then){
   if(!idx.length)return 'Pick at least one die that scores.';
   const vals=idx.map(i=>t.roll[i]);const sc=scoreKeep(vals);
   const rest=t.roll.filter((_,i)=>!idx.includes(i)); // dice from this roll that were not kept
+  if(then==='stop'&&!isOpen(s,p)&&t.total+sc.points<s.opts.open)return `You need ${s.opts.open} points in one turn to start scoring. Keep rolling.`;
   if(!sc.valid)return 'Every die you keep has to score: 1s, 5s, or three of a kind.';
   t.idle=rest;
   t.total+=sc.points;t.kept.push({dice:vals,points:sc.points,cycle:t.cycle||0});t.left-=vals.length;t.roll=null;t.phase='start';
@@ -82,6 +85,8 @@ function keep(s,p,idx,then){
     addLog(s,`${nm(s,p)} went over ${GOAL} and loses ${t.total} points.`);endTurn(s);return null;
   }
   if(then==='stop'||sum===GOAL||(s.opts.finish!=='exact'&&sum>=GOAL)){
+    if(!isOpen(s,p))addLog(s,`${nm(s,p)} is in the game.`);
+    s.opened=s.opened||{};s.opened[p]=true;
     s.scores[p]=sum;s.last={kind:'bank',pid:p,points:t.total,kept:t.kept,rest,cycle:t.kept.length?t.kept[t.kept.length-1].cycle:0};s.holdUntil=Date.now()+HOLD_BANK;
     addLog(s,`${nm(s,p)} scores ${t.total} (total ${sum}).`);
     if(sum>=GOAL){win(s,p,`with ${sum}`);return null}
@@ -99,6 +104,6 @@ function rollPending(s){
   return doRoll(s,t.pid);
 }
 
-const API={rollPending,KEEP_PAUSE,GOAL,scoreKeep,fiveSame,rollScores,bestKeep,nm,addLog,newGame,startTurn,endTurn,doRoll,keep,counts};
+const API={isOpen,rollPending,KEEP_PAUSE,GOAL,scoreKeep,fiveSame,rollScores,bestKeep,nm,addLog,newGame,startTurn,endTurn,doRoll,keep,counts};
 if(typeof module!=='undefined')module.exports=API;else window.DiezMil=API;
 })();

@@ -151,7 +151,8 @@ const server = http.createServer(async (req, res) => {
     const pid = cleanId(b.pid), name = cleanName(b.name);
     if (!pid || !name) return json(res, 400, { error: 'Type your name first.' });
     const code = newCode(), now = Date.now();
-    const opts = { finish: b.finish === 'reach' ? 'reach' : 'exact' };
+    const open = Math.max(0, Math.min(5000, Math.round(Number(b.open) || 0)));
+    const opts = { finish: b.finish === 'reach' ? 'reach' : 'exact', open };
     games.set(code, { code, host: pid, status: 'lobby', opts, createdAt: now, updatedAt: now, players: { [pid]: { name, joinedAt: now } }, rev: 0 });
     return json(res, 200, { code });
   }

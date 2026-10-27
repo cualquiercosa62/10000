@@ -40,7 +40,8 @@ function decide(s, bot) {
     const idx = R.bestKeep(t.roll);
     const pts = R.scoreKeep(idx.map(i => t.roll[i])).points, tot = t.total + pts;
     let left = t.left - idx.length; if (left === 0) left = 5;
-    const stop = (tot >= 300 && left < 5) || (exact && tot >= need) || tot >= need;
+    const canStop = R.isOpen(s, bot) || tot >= s.opts.open;
+    const stop = canStop && ((tot >= 300 && left < 5) || (exact && tot >= need) || tot >= need);
     return { idx, then: stop ? 'stop' : 'roll' };
   }
   // Hard: one step of look-ahead over every possible keep.
@@ -49,7 +50,8 @@ function decide(s, bot) {
     const tot = t.total + o.points;
     if (exact && tot > need) continue;
     let left = t.left - o.idx.length; if (left === 0) left = 5;
-    const stopVal = tot >= need ? 1e9 : tot;
+    const canStop = R.isOpen(s, bot) || tot >= s.opts.open;
+    const stopVal = !canStop ? -1 : tot >= need ? 1e9 : tot;
     const st = STATS[left];
     let rollVal = st.p * (tot + st.gain);
     if (exact && tot + 50 > need) rollVal = -1; // nothing small enough left to land exactly
