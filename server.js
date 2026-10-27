@@ -182,6 +182,15 @@ const server = http.createServer(async (req, res) => {
   res.writeHead(405); res.end();
 });
 
+// Safety net: if a computer player's turn has sat still for 8 seconds, nudge it again.
+setInterval(() => {
+  const now = Date.now();
+  for (const [c, g] of games) {
+    if (g.status === 'playing' && g.turn && BOT.isBot(g, g.turn.pid) && g.turn.phase !== 'pending' && now - g.updatedAt > 8000 && now > (g.holdUntil || 0)) bots.schedule(c, g);
+    if (g.status === 'playing' && g.turn && g.turn.phase === 'pending' && now > g.turn.rollAt + 3000) { if (!R.rollPending(g)) changed(c, g); }
+  }
+}, 4000);
+
 setInterval(() => {
   const now = Date.now();
   for (const [c, g] of games) if (now - g.updatedAt > IDLE_MS) { games.delete(c); broadcast(c); streams.delete(c); bots.schedule(c, null); }

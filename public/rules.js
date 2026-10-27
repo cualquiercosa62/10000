@@ -32,16 +32,21 @@ const nm=(s,p)=>s.players[p]?.name||'Someone';
 function addLog(s,t){s.log=[t,...(s.log||[])].slice(0,40)}
 const rollDice=n=>Array.from({length:n},()=>1+Math.floor(Math.random()*6));
 
-function startTurn(s){
+function startTurn(s,idle){
   const p=s.order[s.turnIdx];
-  s.turn={pid:p,total:0,kept:[],roll:null,left:5,phase:'start',cycle:0};
+  // idle: the five dice as they lie on the table before the next roll (shown, not yet rolled)
+  s.turn={pid:p,total:0,kept:[],roll:null,left:5,phase:'start',cycle:0,idle:(idle&&idle.length===5)?idle:rollDice(5)};
 }
 function newGame(s){
   s.scores={};s.order.forEach(p=>s.scores[p]=0);
   s.turnIdx=Math.floor(Math.random()*s.order.length);s.status='playing';s.holdUntil=0;s.winner=null;s.log=[];s.last=null;s.round=1;
   startTurn(s);addLog(s,`${nm(s,s.order[s.turnIdx])} starts.`);
 }
-function endTurn(s){s.turnIdx=(s.turnIdx+1)%s.order.length;startTurn(s)}
+function endTurn(s){
+  const t=s.turn,cyc=t.cycle||0;
+  const dice=[...t.kept.filter(k=>(k.cycle||0)===cyc).flatMap(k=>k.dice),...(t.roll||t.idle||[])].slice(0,5);
+  s.turnIdx=(s.turnIdx+1)%s.order.length;startTurn(s,dice);
+}
 function win(s,p,why){s.status='gameover';s.winner=p;addLog(s,`${nm(s,p)} wins${why?' '+why:''}!`)}
 
 function doRoll(s,p){
@@ -66,16 +71,18 @@ function keep(s,p,idx,then){
   idx=[...new Set(idx.map(Number))].filter(i=>Number.isInteger(i)&&i>=0&&i<t.roll.length);
   if(!idx.length)return 'Pick at least one die that scores.';
   const vals=idx.map(i=>t.roll[i]);const sc=scoreKeep(vals);
+  const rest=t.roll.filter((_,i)=>!idx.includes(i)); // dice from this roll that were not kept
   if(!sc.valid)return 'Every die you keep has to score: 1s, 5s, or three of a kind.';
+  t.idle=rest;
   t.total+=sc.points;t.kept.push({dice:vals,points:sc.points,cycle:t.cycle||0});t.left-=vals.length;t.roll=null;t.phase='start';
-  const hot=t.left===0;if(hot){t.left=5;t.cycle=(t.cycle||0)+1}
+  const hot=t.left===0;if(hot){t.left=5;t.cycle=(t.cycle||0)+1;t.idle=vals}
   const sum=s.scores[p]+t.total;
   if(s.opts.finish==='exact'&&sum>GOAL){
     s.last={kind:'over',pid:p,lost:t.total,kept:t.kept,cycle:t.kept.length?t.kept[t.kept.length-1].cycle:0};s.holdUntil=Date.now()+HOLD_BUST;
     addLog(s,`${nm(s,p)} went over ${GOAL} and loses ${t.total} points.`);endTurn(s);return null;
   }
   if(then==='stop'||sum===GOAL||(s.opts.finish!=='exact'&&sum>=GOAL)){
-    s.scores[p]=sum;s.last={kind:'bank',pid:p,points:t.total,kept:t.kept,cycle:t.kept.length?t.kept[t.kept.length-1].cycle:0};s.holdUntil=Date.now()+HOLD_BANK;
+    s.scores[p]=sum;s.last={kind:'bank',pid:p,points:t.total,kept:t.kept,rest,cycle:t.kept.length?t.kept[t.kept.length-1].cycle:0};s.holdUntil=Date.now()+HOLD_BANK;
     addLog(s,`${nm(s,p)} scores ${t.total} (total ${sum}).`);
     if(sum>=GOAL){win(s,p,`with ${sum}`);return null}
     endTurn(s);return null;

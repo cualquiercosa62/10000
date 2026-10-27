@@ -106,6 +106,10 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .kslot{display:inline-flex}
 .kslot.newk .die{box-shadow:0 0 0 3px var(--gold),0 6px 14px rgba(0,0,0,.4)}
 .kslot.lost .die{opacity:.45}
+.die.unused{opacity:.55}
+.tray{transition:background .4s ease}
+.tray.mine{border-color:var(--gold)}
+.die.idle{opacity:.8;cursor:default}
 .die.ghost{opacity:.16;cursor:default;box-shadow:none}
 .cap .tp{font-size:1.9rem;line-height:1.1}
 .cap .bigpts{font-size:clamp(2.4rem,9vw,3.4rem)}
@@ -139,6 +143,9 @@ let pid=load('dm.pid');if(!pid){pid='p'+Math.random().toString(36).slice(2,12);s
 let myName=load('dm.name')||load('escoba.name')||'';
 let offline=false,ready=false,view='lobby',code=null,game=null,es=null,openGames=[];
 let sel=new Set(),busy=false,lastRollKey='',animate=false,holdEnd=0,holdRev=-1;
+// Each player gets a felt colour for the dice tray, so it is easy to see whose turn it is.
+const FELTS=[['#5b1f1f','#3d1414'],['#1f4d34','#123322'],['#1e3a63','#12243f'],['#4d2a63','#311a40'],['#1f5455','#123637'],['#6a3d16','#45270d'],['#3f4650','#272c33'],['#55561c','#373812']];
+const feltFor=(s,p)=>FELTS[Math.max(0,s.order.indexOf(p))%FELTS.length];
 const fmt=n=>Number(n||0).toLocaleString('es-AR');
 
 function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,3000)}
@@ -181,7 +188,14 @@ function openGame(c,quiet){
     }
     if(view==='game')render();
   };
-  es.onerror=()=>{if(!got){es.close();es=null;if(!quiet)toast(`No table with code ${c}.`);leave()}};
+  es.onerror=()=>{
+    if(!got){es.close();es=null;if(!quiet)toast(`No table with code ${c}.`);leave();return}
+    // The browser retries on its own; if the server no longer has this table (it restarted), say so.
+    clearTimeout(openGame.chk);openGame.chk=setTimeout(async()=>{
+      try{const r=await fetch('/api/events?code='+encodeURIComponent(c)+'&pid='+encodeURIComponent(pid),{method:'GET',headers:{Accept:'application/json'}});
+        if(r.status===404){if(es)es.close();es=null;toast('This table was lost when the server restarted. Please start a new one.');leave()}else{r.body&&r.body.cancel&&r.body.cancel()}}catch(e){}
+    },3000);
+  };
 }
 function leave(){if(es)es.close();es=null;game=null;code=null;view='lobby';unstore('dm.game');try{history.replaceState(null,'','#')}catch(e){}render();pollLobby()}
 async function pollLobby(){
@@ -195,7 +209,7 @@ async function pollLobby(){
 const PIPS={1:[5],2:[3,7],3:[3,5,7],4:[1,3,7,9],5:[1,3,5,7,9],6:[1,3,4,6,7,9]};
 function dieHTML(v,o={}){
   const cells=Array.from({length:9},(_,i)=>PIPS[v].includes(i+1)?'<span class="p"></span>':'<span></span>').join('');
-  return `<button class="die${v===1?' one':''}${o.sm?' sm':''}${o.sel?' sel':''}" ${o.i!=null?`data-act="die" data-i="${o.i}"`:''} ${o.dis?'disabled':''} aria-label="Die showing ${v}" aria-pressed="${!!o.sel}">${cells}</button>`;
+  return `<button class="die${o.cls?' '+o.cls:''}${v===1?' one':''}${o.sm?' sm':''}${o.sel?' sel':''}" ${o.i!=null?`data-act="die" data-i="${o.i}"`:''} ${o.dis?'disabled':''} aria-label="Die showing ${v}" aria-pressed="${!!o.sel}">${cells}</button>`;
 }
 const finishText=o=>o.finish==='reach'?'first to reach 10.000 wins':'finish on exactly 10.000';
 const RULES=`<details class="panel"><summary>How to play</summary><ul>
@@ -251,12 +265,13 @@ function renderGame(){
     return;
   }
   const t=s.turn||{},myTurn=s.status==='playing'&&t.pid===pid;
-  const board=s.order.map(p=>`<div class="pl${s.status==='playing'&&t.pid===p?' turn':''}"><div class="nm"><span>${esc(nm(p))}${p===pid?' (you)':''}</span><span class="score">${fmt(s.scores[p])}</span></div><div class="bar" aria-hidden="true"><i style="width:${Math.min(100,(s.scores[p]||0)/100)}%"></i></div>${s.players[p].bot?'<span class="note">computer</span>':''}</div>`).join('');
+  const feltStyle=p=>{const f=feltFor(s,p);return `--tray:${f[0]};--tray-deep:${f[1]}`};
+  const board=s.order.map(p=>`<div class="pl${s.status==='playing'&&t.pid===p?' turn':''}" style="border-left:8px solid ${feltFor(s,p)[0]}"><div class="nm"><span>${esc(nm(p))}${p===pid?' (you)':''}</span><span class="score">${fmt(s.scores[p])}</span></div><div class="bar" aria-hidden="true"><i style="width:${Math.min(100,(s.scores[p]||0)/100)}%"></i></div>${s.players[p].bot?'<span class="note">computer</span>':''}</div>`).join('');
 
   let tray='';
   if(s.status==='gameover'){
     const L=s.last;
-    tray=`<section class="tray"><div class="win">${esc(nm(s.winner))} wins!</div>
+    tray=`<section class="tray" style="${feltStyle(s.winner)}"><div class="win">${esc(nm(s.winner))} wins!</div>
       ${L&&L.kind==='five'?`<div class="dice">${L.roll.map(v=>dieHTML(v,{dis:true})).join('')}</div><div>Five ${L.roll[0]}s in one roll.</div>`:`<div>${fmt(s.scores[s.winner])} points.</div>`}
       <div class="actions"><button class="btn big" data-act="rematch" ${s.order.includes(pid)?'':'disabled'}>Play again, same table</button></div></section>`;
   }else{
@@ -279,11 +294,11 @@ function renderGame(){
       const W=`<b>${esc(nm(L.pid))}</b>`,ks=L.kept||[],cyc=L.cycle||0;
       const keptN=ks.filter(k=>(k.cycle||0)===cyc).reduce((n,k)=>n+k.dice.length,0);
       if(L.kind==='bank'){
-        tray2=`<section class="tray"><div class="who big">${W} stopped</div>
-          ${strip(Array.from({length:5-keptN},()=>ghost).join(''),ks,cyc,`<div class="bigpts good">+${fmt(L.points)}</div>`,'')}</section>`;
+        tray2=`<section class="tray" style="${feltStyle(L.pid)}"><div class="who big">${W} stopped</div>
+          ${strip((L.rest||[]).map(v=>dieHTML(v,{dis:true,cls:'unused'})).join(''),ks,cyc,`<div class="bigpts good">+${fmt(L.points)}</div>`,(L.rest||[]).length?'Not kept':'')}</section>`;
       }else{
-        const live=L.roll?L.roll.map(v=>dieHTML(v,{dis:true})).join(''):Array.from({length:5-keptN},()=>ghost).join('');
-        tray2=`<section class="tray"><div class="who big">${W} ${L.kind==='bust'?'rolled nothing that scores':'went over 10.000'}</div>
+        const live=(L.roll||L.rest||[]).map(v=>dieHTML(v,{dis:true,cls:L.roll?'':'unused'})).join('');
+        tray2=`<section class="tray" style="${feltStyle(L.pid)}"><div class="who big">${W} ${L.kind==='bust'?'rolled nothing that scores':'went over 10.000'}</div>
           ${strip(live,ks,cyc,`<div class="bigpts bad">0</div>${L.lost?`<div class="note">${fmt(L.lost)} lost</div>`:''}`,L.kind==='bust'?'Nothing scores':'',{lost:true,anim:true})}</section>`;
       }
     }else{
@@ -304,12 +319,12 @@ function renderGame(){
             <div class="actions"><button class="btn small ghost" data-act="pickall">Pick all scoring dice</button></div>`;
         }else cap=`${esc(nm(t.pid))} is choosing…`;
       }else{
-        live=Array.from({length:5-keptN},()=>ghost).join('');
+        live=cyc!==(t.cycle||0)?'':(t.idle||[]).slice(0,5-keptN).map(v=>dieHTML(v,{dis:true,cls:'idle'})).join('');
         if(t.phase==='pending')cap=`Rolling ${5-keptN===0?'all 5 again':(5-keptN)+(5-keptN===1?' die':' dice')}…`;
         else if(myTurn)buttons=`<div class="actions"><button class="btn big" data-act="roll">Roll ${t.left===5?'5 dice':t.left+' dice'}</button></div>`;
         else cap=`Waiting for ${esc(nm(t.pid))} to roll…`;
       }
-      tray2=`<section class="tray"><div class="who big">${myTurn?'<b>Your turn</b>':`<b>${esc(nm(t.pid))}</b>'s turn`}</div>
+      tray2=`<section class="tray${myTurn?' mine':''}" style="${feltStyle(t.pid)}"><div class="who big">${myTurn?'<b>Your turn</b>':`<b>${esc(nm(t.pid))}</b>'s turn`}</div>
         ${strip(live,ks,cyc,`<div class="tp"><small>Turn points</small>${fmt(t.total)}</div>`,cap,{newLast:t.phase==='pending',anim:true})}
         ${buttons}</section>`;
     }
