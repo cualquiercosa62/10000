@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Diez Mil</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;700;800&family=Figtree:wght@400;500;700&display=swap">
+<style>
+/* Layout: a leather dice tray. Scoreboard on top, the tray with this turn's dice in the middle, history below. Single deliberate dark look. */
+:root{
+  --bg:#1d1411; --bg-2:#2a1c17; --line:#4a342b;
+  --tray:#5b1f1f; --tray-deep:#3d1414; --tray-line:#7a3a33;
+  --ink:#f3e9dc; --ink-dim:#c4b1a3; --gold:#e9b949; --gold-deep:#a37a1a;
+  --die:#fbf7ef; --die-edge:#d9cdb9; --pip:#231a16; --pip-one:#b5272a;
+  --good:#8fd3a0; --danger:#ec8a74;
+  --display:"Bitter", Georgia, serif;
+  --body:"Figtree", system-ui, sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{min-height:100%}
+body{margin:0;min-height:100vh;background:radial-gradient(110% 60% at 50% 0%, var(--bg-2) 0%, var(--bg) 100%) no-repeat var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45}
+[hidden]{display:none!important}
+.wrap{max-width:980px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance}
+h1{font-size:clamp(2.4rem,7vw,3.6rem);font-weight:800;color:var(--gold);line-height:1;letter-spacing:-.01em}
+h1 small{display:block;font-family:var(--body);font-size:.9rem;font-weight:500;color:var(--ink-dim);letter-spacing:.14em;text-transform:uppercase;margin-top:8px}
+h2{font-size:1.35rem;font-weight:700}
+.sub{color:var(--ink-dim);margin:6px 0 0;max-width:60ch}
+.eyebrow{font-size:.75rem;text-transform:uppercase;letter-spacing:.14em;color:var(--ink-dim)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.panel{background:rgba(0,0,0,.25);border:1px solid var(--line);border-radius:14px;padding:16px}
+label{font-size:.85rem;color:var(--ink-dim);display:flex;flex-direction:column;gap:4px}
+input,select{font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:9px 11px;min-width:0}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.btn{font:inherit;font-weight:700;cursor:pointer;border-radius:999px;padding:10px 20px;border:1px solid var(--gold);background:var(--gold);color:#2a1d04}
+.btn:hover:not(:disabled){background:#f2ca6c}
+.btn.ghost{background:transparent;color:var(--gold)}
+.btn.ghost:hover:not(:disabled){background:rgba(233,185,73,.12)}
+.btn.big{font-size:1.1rem;padding:13px 26px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.small{padding:5px 12px;font-size:.85rem}
+.note{font-size:.9rem;color:var(--ink-dim)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}
+.list{display:flex;flex-direction:column;gap:8px;margin:10px 0 0;padding:0;list-style:none}
+.list li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.04)}
+.code{font-family:var(--display);font-weight:800;letter-spacing:.18em;color:var(--gold)}
+.bigcode{font-size:2.6rem;line-height:1}
+.tag{font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--ink-dim)}
+.tag.on{border-color:var(--gold);color:var(--gold)}
+.topbar{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:flex-end}
+
+/* scoreboard */
+.board{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:10px}
+.pl{padding:10px 12px;border-radius:12px;background:rgba(0,0,0,.25);border:1px solid var(--line);display:flex;flex-direction:column;gap:6px;min-width:0}
+.pl.turn{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
+.pl .nm{display:flex;justify-content:space-between;gap:8px;align-items:baseline;min-width:0}
+.pl .nm span:first-child{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl .score{font-family:var(--display);font-weight:800;font-size:1.5rem;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1}
+.bar{height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--gold)}
+
+/* tray */
+.tray{border-radius:22px;padding:20px 14px;background:radial-gradient(120% 100% at 50% 30%, var(--tray) 0%, var(--tray-deep) 100%);border:6px solid #2d1a12;box-shadow:inset 0 4px 18px rgba(0,0,0,.55);display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center}
+.turnhead{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;align-items:baseline}
+.turnhead .who{font-size:1.15rem}
+.turnhead .who b{color:var(--gold)}
+.tp{font-family:var(--display);font-weight:800;font-size:1.6rem;font-variant-numeric:tabular-nums}
+.tp small{font-family:var(--body);font-weight:500;font-size:.8rem;color:var(--ink-dim);letter-spacing:.1em;text-transform:uppercase;margin-right:6px}
+.dice{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;min-height:84px;align-items:center}
+.die{width:72px;height:72px;border-radius:14px;background:var(--die);border:1px solid var(--die-edge);box-shadow:0 3px 0 #b9ab92,0 8px 16px rgba(0,0,0,.4);display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:11px;cursor:pointer;transition:transform .15s ease, box-shadow .15s ease;font:inherit;flex:none}
+.die:disabled{cursor:default}
+.die:not(:disabled):hover{transform:translateY(-3px)}
+.die .p{width:13px;height:13px;border-radius:50%;background:var(--pip);place-self:center}
+.die.one .p{background:var(--pip-one);width:18px;height:18px}
+.die.sel{transform:translateY(-10px);box-shadow:0 0 0 4px var(--gold),0 12px 20px rgba(0,0,0,.45)}
+.die.sm{width:40px;height:40px;border-radius:8px;padding:6px;box-shadow:0 2px 0 #b9ab92;cursor:default}
+.die.sm .p{width:7px;height:7px}.die.sm.one .p{width:10px;height:10px}
+.rolling .die{animation:tumble .55s cubic-bezier(.3,.7,.4,1)}
+.rolling .die:nth-child(2){animation-delay:.04s}.rolling .die:nth-child(3){animation-delay:.08s}.rolling .die:nth-child(4){animation-delay:.12s}.rolling .die:nth-child(5){animation-delay:.16s}
+@keyframes tumble{0%{transform:translateY(-30px) rotate(-200deg) scale(.7);opacity:0}60%{transform:translateY(4px) rotate(10deg) scale(1.03);opacity:1}100%{transform:none}}
+.kept{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.kgrp{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 8px;border-radius:10px;background:rgba(0,0,0,.25)}
+.kgrp .row{gap:4px}
+.kgrp span{font-size:.8rem;color:var(--ink-dim);font-variant-numeric:tabular-nums}
+.selinfo{min-height:1.5em;font-size:1.05rem}
+.selinfo b{color:var(--gold)}
+.selinfo .bad{color:var(--danger)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.event{padding:10px 14px;border-radius:12px;background:rgba(0,0,0,.3);border:1px solid var(--tray-line);display:flex;flex-direction:column;gap:8px;align-items:center}
+.event.bust{border-color:var(--danger)}
+.event.good{border-color:var(--gold-deep)}
+.event .row{gap:6px;justify-content:center}
+.log{max-height:200px;overflow:auto;font-size:.9rem;color:var(--ink-dim);display:flex;flex-direction:column;gap:4px;margin:8px 0 0;padding:0;list-style:none}
+.log li:first-child{color:var(--ink)}
+details summary{cursor:pointer;font-family:var(--display);font-weight:700;font-size:1.1rem}
+details ul{margin:10px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;max-width:65ch}
+.win{font-family:var(--display);font-weight:800;font-size:clamp(1.8rem,6vw,2.6rem);color:var(--gold)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);background:var(--die);color:var(--pip);padding:10px 18px;border-radius:999px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:20;max-width:calc(100% - 32px)}
+@media (prefers-reduced-motion:reduce){.die,.rolling .die{transition:none;animation:none}}
+@media (max-width:520px){.die{width:58px;height:58px;padding:9px;border-radius:11px}.die .p{width:10px;height:10px}.die.one .p{width:14px;height:14px}.dice{gap:9px}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div class="toast" id="toast" hidden></div>
+<script src="/rules.js"></script>
+<script>
+const R=window.DiezMil;
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const $=s=>document.querySelector(s);
+const app=$('#app');
+function store(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function load(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function unstore(k){try{localStorage.removeItem(k)}catch(e){}}
+let pid=load('dm.pid');if(!pid){pid='p'+Math.random().toString(36).slice(2,12);store('dm.pid',pid)}
+let myName=load('dm.name')||load('escoba.name')||'';
+let offline=false,ready=false,view='lobby',code=null,game=null,es=null,openGames=[];
+let sel=new Set(),busy=false,lastRollKey='',animate=false;
+const fmt=n=>Number(n||0).toLocaleString('es-AR');
+
+function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,3000)}
+function getName(){const v=($('#name')?.value||myName||'').trim().slice(0,20);if(!v){toast('Type your name first.');$('#name')?.focus();return null}myName=v;store('dm.name',v);return v}
+async function post(url,body){
+  if(busy)return null;busy=true;
+  try{const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pid,code,...body})});const j=await r.json();if(j.error){toast(j.error);return null}return j}
+  catch(e){toast('Could not reach the server. Try again.');return null}
+  finally{busy=false}
+}
+const act=(type,extra={})=>post('/api/action',{type,...extra});
+
+async function createGame(solo){
+  const name=getName();if(!name)return;
+  const finish=$('#finish').value,level=$('#botlevel')?.value||'easy';store('dm.finish',finish);store('dm.botlevel',level);
+  const j=await post('/api/create',{name,finish});if(!j)return;
+  openGame(j.code);
+  if(solo){await act('addbot',{level});await act('start')}
+}
+function openGame(c,quiet){
+  c=c.toUpperCase();if(es)es.close();code=c;game=null;view='game';sel.clear();lastRollKey='';
+  try{history.replaceState(null,'','#'+c)}catch(e){}
+  render();
+  es=new EventSource('/api/events?code='+encodeURIComponent(c)+'&pid='+encodeURIComponent(pid));
+  let got=false;
+  es.onmessage=ev=>{
+    got=true;const s=JSON.parse(ev.data);
+    if(s.gone){toast('The table was closed.');return leave()}
+    game=s;store('dm.game',c);
+    // Animate a fresh roll (or the roll that just went bust) once.
+    const roll=s.turn&&s.turn.roll;
+    const key=roll?'R'+s.rev:(s.last&&s.last.kind==='bust'&&s.last.rev===s.rev?'B'+s.rev:'');
+    animate=false;
+    if(key&&key!==lastRollKey){animate=true;sel.clear();lastRollKey=key}
+    if(!roll)sel.clear();
+    if(view==='game')render();
+  };
+  es.onerror=()=>{if(!got){es.close();es=null;if(!quiet)toast(`No table with code ${c}.`);leave()}};
+}
+function leave(){if(es)es.close();es=null;game=null;code=null;view='lobby';unstore('dm.game');try{history.replaceState(null,'','#')}catch(e){}render();pollLobby()}
+async function pollLobby(){
+  clearTimeout(pollLobby.t);if(view!=='lobby')return;
+  try{const r=await fetch('/api/lobby');openGames=await r.json();offline=false}catch(e){offline=true}
+  ready=true;if(view==='lobby')renderLobby();
+  pollLobby.t=setTimeout(pollLobby,4000);
+}
+
+/* ---------- render ---------- */
+const PIPS={1:[5],2:[3,7],3:[3,5,7],4:[1,3,7,9],5:[1,3,5,7,9],6:[1,3,4,6,7,9]};
+function dieHTML(v,o={}){
+  const cells=Array.from({length:9},(_,i)=>PIPS[v].includes(i+1)?'<span class="p"></span>':'<span></span>').join('');
+  return `<button class="die${v===1?' one':''}${o.sm?' sm':''}${o.sel?' sel':''}" ${o.i!=null?`data-act="die" data-i="${o.i}"`:''} ${o.dis?'disabled':''} aria-label="Die showing ${v}" aria-pressed="${!!o.sel}">${cells}</button>`;
+}
+const finishText=o=>o.finish==='reach'?'first to reach 10.000 wins':'finish on exactly 10.000';
+const RULES=`<details class="panel"><summary>How to play</summary><ul>
+<li>On your turn, roll the five dice. Pick the dice that score and set them aside, then roll the rest again or stop and add your turn points to your score.</li>
+<li>A <b>1</b> is worth 100 and a <b>5</b> is worth 50. Three of a kind in the same roll: three 1s = 1.000, three of any other number = that number × 100 (three 4s = 400). A 4th or 5th die of that number only adds if it is a 1 or a 5.</li>
+<li><b>Five of the same number in one roll wins the game.</b> Straights don't count.</li>
+<li>Every die you keep must score. If a roll has nothing that scores, you lose all the points from that turn.</li>
+<li>If all five dice score, you can roll all five again and keep adding, or stop and bank what you have.</li>
+<li>The table decides how the game ends: land on exactly 10.000 (going over loses that turn's points), or be the first to reach 10.000.</li>
+<li>Computer players can join any table. Easy ones play cautiously. Hard ones weigh the odds on every roll.</li></ul></details>`;
+function render(){view==='lobby'?renderLobby():renderGame()}
+
+function renderLobby(){
+  const blocked=offline?`<div class="panel">Can't reach the game server. Check your connection. This page keeps retrying.</div>`:'';
+  const list=openGames.length?`<ul class="list">${openGames.map(g=>`<li><span><span class="code">${esc(g.code)}</span> &nbsp;${esc(g.names.join(', '))} <span class="note">· ${g.names.length}/8 · ${finishText(g.opts)}</span></span><button class="btn small ghost" data-act="open" data-code="${esc(g.code)}">Open</button></li>`).join('')}</ul>`
+    :`<p class="note">${ready?'No tables waiting right now. Start one and tell your friends the code.':'Looking for open tables…'}</p>`;
+  if($('#lobby')){$('#openlist').innerHTML=list;$('#lobbynote').innerHTML=blocked;return}
+  const f=load('dm.finish')||'exact',lv=load('dm.botlevel')||'easy';
+  app.innerHTML=`<header><h1>Diez Mil<small>10.000 · five dice · 2 to 8 players</small></h1><p class="sub">Roll, keep your 1s, 5s and threes, and decide when to stop before the dice turn on you.</p></header>
+  <div id="lobbynote">${blocked}</div>
+  <div class="grid2" id="lobby">
+    <section class="panel" style="display:flex;flex-direction:column;gap:14px">
+      <h2>Start a table</h2>
+      <label for="name">Your name<input id="name" maxlength="20" autocomplete="nickname" value="${esc(myName)}" placeholder="e.g. Sil"></label>
+      <label for="finish">How the game ends<select id="finish"><option value="exact" ${f==='exact'?'selected':''}>Land on exactly 10.000</option><option value="reach" ${f==='reach'?'selected':''}>First to reach 10.000</option></select></label>
+      <div class="row"><button class="btn" data-act="create">Create table</button></div>
+      <div class="row" style="align-items:flex-end"><label for="botlevel">Computer plays<select id="botlevel"><option value="easy" ${lv==='easy'?'selected':''}>Easy</option><option value="hard" ${lv==='hard'?'selected':''}>Hard</option></select></label><button class="btn ghost" data-act="solo">Play against the computer</button></div>
+      <hr style="border:0;border-top:1px solid var(--line);width:100%;margin:2px 0">
+      <label for="joincode">Have a code?<div class="row"><input id="joincode" maxlength="4" placeholder="ABCD" style="text-transform:uppercase;width:7.5em;letter-spacing:.15em"><button class="btn ghost" data-act="joincode">Go to table</button></div></label>
+    </section>
+    <section class="panel"><h2>Open tables</h2><div id="openlist">${list}</div></section>
+  </div>${RULES}`;
+}
+
+function renderGame(){
+  const s=game;
+  if(!s){app.innerHTML=`<p class="note">Opening table ${esc(code)}…</p>`;return}
+  const nm=p=>s.players[p]?.name||'Someone';
+  const back=`<button class="btn small ghost" data-act="leave">Back to lobby</button>`;
+  if(s.status==='lobby'){
+    const ps=Object.entries(s.players||{}).sort((a,b)=>a[1].joinedAt-b[1].joinedAt);
+    const seated=!!s.players?.[pid],host=s.host===pid;
+    app.innerHTML=`<div class="topbar"><div><div class="eyebrow">Table code</div><div class="code bigcode">${esc(s.code)}</div></div>${back}</div>
+    <section class="panel" style="display:flex;flex-direction:column;gap:12px">
+      <h2>Waiting for players</h2>
+      <p class="note">Friends open this website and enter the code <b class="code">${esc(s.code)}</b>, or pick it from Open tables. This table: ${finishText(s.opts)}.</p>
+      <ul class="list">${ps.map(([p,v],i)=>`<li><span>${esc(v.name)}${p===pid?' <span class="note">(you)</span>':''}</span><span class="row" style="gap:6px">${v.bot?'<span class="tag">computer</span>':''}<span class="tag${p===s.host?' on':''}">${p===s.host?'host':'seat '+(i+1)}</span>${v.bot&&host?`<button class="btn small ghost" data-act="removebot" data-id="${esc(p)}">Remove</button>`:''}</span></li>`).join('')}</ul>
+      ${host&&ps.length<8?`<div class="row" style="align-items:flex-end"><label for="addlevel">Add a computer player<select id="addlevel"><option value="easy">Easy</option><option value="hard">Hard</option></select></label><button class="btn small ghost" data-act="addbot">Add computer</button></div>`:''}
+      ${!seated?`<div class="row" style="align-items:flex-end"><label for="name">Your name<input id="name" maxlength="20" value="${esc(myName)}" placeholder="Your name"></label><button class="btn" data-act="join" ${ps.length>=8?'disabled':''}>Take a seat</button></div>`:''}
+      <div class="row">${host?`<button class="btn" data-act="start" ${ps.length<2?'disabled':''}>Start the game</button><span class="note">${ps.length<2?'Needs at least 2 players.':ps.length+' players ready. A random player goes first.'}</span>`:(seated?`<span class="note">Waiting for ${esc(nm(s.host))} to start.</span><button class="btn small ghost" data-act="unseat">Give up seat</button>`:'')}</div>
+    </section>${RULES}`;
+    return;
+  }
+  const t=s.turn||{},myTurn=s.status==='playing'&&t.pid===pid;
+  const board=s.order.map(p=>`<div class="pl${s.status==='playing'&&t.pid===p?' turn':''}"><div class="nm"><span>${esc(nm(p))}${p===pid?' (you)':''}</span><span class="score">${fmt(s.scores[p])}</span></div><div class="bar" aria-hidden="true"><i style="width:${Math.min(100,(s.scores[p]||0)/100)}%"></i></div>${s.players[p].bot?'<span class="note">computer</span>':''}</div>`).join('');
+
+  let tray='';
+  if(s.status==='gameover'){
+    const L=s.last;
+    tray=`<section class="tray"><div class="win">${esc(nm(s.winner))} wins!</div>
+      ${L&&L.kind==='five'?`<div class="dice">${L.roll.map(v=>dieHTML(v,{dis:true})).join('')}</div><div>Five ${L.roll[0]}s in one roll.</div>`:`<div>${fmt(s.scores[s.winner])} points.</div>`}
+      <div class="actions"><button class="btn big" data-act="rematch" ${s.order.includes(pid)?'':'disabled'}>Play again, same table</button></div></section>`;
+  }else{
+    // How the previous turn ended, shown until the new player rolls.
+    let event='';
+    const L=s.last;
+    if(L&&t.phase==='start'&&!t.kept.length&&L.pid!==t.pid){
+      if(L.kind==='bust')event=`<div class="event bust"><div><b>${esc(nm(L.pid))}</b> rolled nothing that scores${L.lost?` and lost ${fmt(L.lost)} points`:''}.</div><div class="dice ${animate?'rolling':''}">${L.roll.map(v=>dieHTML(v,{dis:true,sm:true})).join('')}</div></div>`;
+      else if(L.kind==='over')event=`<div class="event bust"><div><b>${esc(nm(L.pid))}</b> went over 10.000 and lost ${fmt(L.lost)} points.</div></div>`;
+      else if(L.kind==='bank')event=`<div class="event good"><div><b>${esc(nm(L.pid))}</b> stopped and scored <b>${fmt(L.points)}</b>.</div></div>`;
+    }
+    const kept=(t.kept||[]).map(k=>`<div class="kgrp"><div class="row">${k.dice.map(v=>dieHTML(v,{sm:true,dis:true})).join('')}</div><span>${fmt(k.points)}</span></div>`).join('');
+    let dice='',info='',buttons='';
+    if(t.phase==='choose'&&t.roll){
+      dice=`<div class="dice ${animate?'rolling':''}">${t.roll.map((v,i)=>dieHTML(v,{i,sel:sel.has(i),dis:!myTurn})).join('')}</div>`;
+      if(myTurn){
+        const vals=[...sel].map(i=>t.roll[i]),sc=R.scoreKeep(vals);
+        const ok=sel.size>0&&sc.valid;
+        let left=t.left-sel.size;const hot=left===0;if(hot)left=5;
+        const after=t.total+(ok?sc.points:0),sum=(s.scores[pid]||0)+after;
+        const over=s.opts.finish==='exact'&&sum>R.GOAL;
+        info=!sel.size?'Tap the dice you want to keep.':!sc.valid?'<span class="bad">Every die you keep has to score.</span>':`Keeping <b>${fmt(sc.points)}</b> · turn total <b>${fmt(after)}</b>${over?' · <span class="bad">that goes over 10.000</span>':''}`;
+        buttons=`<div class="actions"><button class="btn big" data-act="keep-roll" ${ok?'':'disabled'}>${hot?'Keep and roll all 5 again':`Keep and roll ${left}`}</button><button class="btn ghost big" data-act="keep-stop" ${ok?'':'disabled'}>Keep and stop${ok?` (+${fmt(after)})`:''}</button></div>
+          <div class="actions"><button class="btn small ghost" data-act="pickall">Pick all scoring dice</button></div>`;
+      }else info=`<b>${esc(nm(t.pid))}</b> is choosing which dice to keep…`;
+    }else{
+      dice=`<div class="dice">${Array.from({length:t.left||5},()=>'<span class="die" style="opacity:.18;cursor:default" aria-hidden="true"></span>').join('')}</div>`;
+      if(myTurn)buttons=`<div class="actions"><button class="btn big" data-act="roll">Roll ${t.left===5?'5 dice':t.left+' dice'}</button></div>`;
+      else info=`Waiting for <b>${esc(nm(t.pid))}</b> to roll…`;
+    }
+    tray=`<section class="tray">${event}
+      <div class="turnhead"><div class="who">${myTurn?'<b>Your turn</b>':`<b>${esc(nm(t.pid))}</b>'s turn`}</div><div class="tp"><small>Turn points</small>${fmt(t.total)}</div></div>
+      ${kept?`<div class="kept">${kept}</div>`:''}
+      ${dice}<div class="selinfo">${info}</div>${buttons}</section>`;
+  }
+  app.innerHTML=`<div class="topbar"><div><div class="eyebrow">Table <span class="code">${esc(s.code)}</span> · ${finishText(s.opts)}</div><h2>Diez Mil</h2></div><div class="row">${back}</div></div>
+  <div class="board">${board}</div>
+  ${tray}
+  <section class="panel"><div class="row" style="justify-content:space-between"><h3>History</h3>${s.host===pid?'<button class="btn small ghost" data-act="end">Close table</button>':''}</div><ul class="log">${(s.log||[]).map(l=>`<li>${esc(l)}</li>`).join('')}</ul></section>`;
+  animate=false;
+}
+
+app.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b||b.disabled)return;
+  const a=b.dataset.act;
+  switch(a){
+    case 'create':return createGame(false);
+    case 'solo':return createGame(true);
+    case 'joincode':{const v=($('#joincode').value||'').trim().toUpperCase();if(!/^[A-Z]{4}$/.test(v))return toast('Codes are 4 letters, like ABCD.');getName();return openGame(v)}
+    case 'open':getName();return openGame(b.dataset.code);
+    case 'leave':return leave();
+    case 'join':{const name=getName();if(name)act('join',{name});return}
+    case 'unseat':return act('unseat').then(j=>j&&leave());
+    case 'addbot':return act('addbot',{level:$('#addlevel').value});
+    case 'removebot':return act('removebot',{id:b.dataset.id});
+    case 'start':return act('start');
+    case 'roll':return act('roll');
+    case 'die':{const i=+b.dataset.i;sel.has(i)?sel.delete(i):sel.add(i);return render()}
+    case 'pickall':sel=new Set(R.bestKeep(game.turn.roll));return render();
+    case 'keep-roll':return act('keep',{idx:[...sel],then:'roll'});
+    case 'keep-stop':return act('keep',{idx:[...sel],then:'stop'});
+    case 'rematch':return act('rematch');
+    case 'end':return act('close').then(j=>j&&leave());
+  }
+});
+app.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='joincode')app.querySelector('[data-act="joincode"]')?.click()});
+
+const h=location.hash.slice(1).toUpperCase(),saved=load('dm.game');
+if(/^[A-Z]{4}$/.test(h))openGame(h);else if(saved)openGame(saved,true);else{render();pollLobby()}
+</script>
+</body>
+</html>
