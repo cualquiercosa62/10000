@@ -109,6 +109,7 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .die.unused{opacity:.55}
 .tray{transition:background .4s ease}
 .tray.mine{border-color:var(--gold)}
+.die.blank{cursor:default}
 .die.idle{opacity:.8;cursor:default}
 .die.ghost{opacity:.16;cursor:default;box-shadow:none}
 .cap .tp{font-size:1.9rem;line-height:1.1}
@@ -319,7 +320,8 @@ function renderGame(){
             <div class="actions"><button class="btn small ghost" data-act="pickall">Pick all scoring dice</button></div>`;
         }else cap=`${esc(nm(t.pid))} is choosing…`;
       }else{
-        live=cyc!==(t.cycle||0)?'':(t.idle||[]).slice(0,5-keptN).map(v=>dieHTML(v,{dis:true,cls:'idle'})).join('');
+        // Start of a turn: blank dice, so it is clear the player has to roll. Otherwise show the dice as they lie.
+        live=cyc!==(t.cycle||0)?'':(t.phase==='start'&&!t.kept.length)?Array.from({length:5},()=>'<span class="die blank" aria-hidden="true"></span>').join(''):(t.idle||[]).slice(0,5-keptN).map(v=>dieHTML(v,{dis:true,cls:'idle'})).join('');
         if(t.phase==='pending')cap=`Rolling ${5-keptN===0?'all 5 again':(5-keptN)+(5-keptN===1?' die':' dice')}…`;
         else if(myTurn)buttons=`<div class="actions"><button class="btn big" data-act="roll">Roll ${t.left===5?'5 dice':t.left+' dice'}</button></div>`;
         else cap=`Waiting for ${esc(nm(t.pid))} to roll…`;
