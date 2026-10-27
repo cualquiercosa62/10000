@@ -92,6 +92,7 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .who.big{font-size:1.3rem}.who.big b{color:var(--gold)}
 .bigpts{font-family:var(--display);font-weight:800;font-size:clamp(3rem,12vw,4.5rem);line-height:1;font-variant-numeric:tabular-nums}
 .bigpts.good{color:var(--gold)}.bigpts.bad{color:var(--danger)}
+.nokept{min-height:58px;display:flex;align-items:center;color:var(--ink-dim);font-size:.9rem}
 .kept.lost .kgrp{opacity:.45}.kept.lost .kgrp span{text-decoration:line-through}
 .log{max-height:200px;overflow:auto;font-size:.9rem;color:var(--ink-dim);display:flex;flex-direction:column;gap:4px;margin:8px 0 0;padding:0;list-style:none}
 .log li:first-child{color:var(--ink)}
@@ -268,12 +269,12 @@ function renderGame(){
         <div class="eyebrow">Kept this turn</div><div class="kept">${ks.map(k=>grp(k)).join('')}</div>
         <div class="bigpts good">+${fmt(L.points)}</div><div class="note">points this turn</div></section>`;
       else tray=`<section class="tray"><div class="who big">${W} ${L.kind==='bust'?'rolled nothing that scores':'went over 10.000'}</div>
-        ${ks.length?`<div class="eyebrow">Kept this turn</div><div class="kept lost">${ks.map(k=>grp(k)).join('')}</div>`:''}
+        <div class="eyebrow">Kept this turn</div><div class="kept lost">${ks.length?ks.map(k=>grp(k)).join(''):'<div class="nokept">Nothing kept</div>'}</div>
         ${L.roll?`<div class="eyebrow">Last roll</div><div class="dice ${animate?'rolling':''}">${L.roll.map(v=>dieHTML(v,{dis:true})).join('')}</div>`:''}
         <div class="bigpts bad">0</div><div class="note">points this turn${L.lost?` · ${fmt(L.lost)} lost`:''}</div></section>`;
     }else tray=`<section class="tray">
       <div class="turnhead"><div class="who">${myTurn?'<b>Your turn</b>':`<b>${esc(nm(t.pid))}</b>'s turn`}</div><div class="tp"><small>Turn points</small>${fmt(t.total)}</div></div>
-      ${kept?`<div class="eyebrow">Kept this turn</div><div class="kept">${kept}</div>`:''}
+      <div class="eyebrow">Kept this turn</div><div class="kept">${kept||'<div class="nokept">Nothing kept yet</div>'}</div>
       ${t.phase==='choose'&&t.roll?'<div class="eyebrow">Rolled</div>':''}${dice}<div class="selinfo">${info}</div>${buttons}</section>`;
   }
   app.innerHTML=`<div class="topbar"><div><div class="eyebrow">Table <span class="code">${esc(s.code)}</span> · ${finishText(s.opts)}</div><h2>Diez Mil</h2></div><div class="row">${back}</div></div>
