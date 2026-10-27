@@ -265,16 +265,16 @@ function renderGame(){
     if(holding){
       const W=`<b>${esc(nm(L.pid))}</b>`,ks=(L.kept||[]);
       if(L.kind==='bank')tray=`<section class="tray"><div class="who big">${W} stopped</div>
-        <div class="kept">${ks.map(k=>grp(k)).join('')}</div>
+        <div class="eyebrow">Kept this turn</div><div class="kept">${ks.map(k=>grp(k)).join('')}</div>
         <div class="bigpts good">+${fmt(L.points)}</div><div class="note">points this turn</div></section>`;
       else tray=`<section class="tray"><div class="who big">${W} ${L.kind==='bust'?'rolled nothing that scores':'went over 10.000'}</div>
-        ${L.roll?`<div class="dice ${animate?'rolling':''}">${L.roll.map(v=>dieHTML(v,{dis:true})).join('')}</div>`:''}
-        ${ks.length?`<div class="kept lost">${ks.map(k=>grp(k)).join('')}</div>`:''}
+        ${ks.length?`<div class="eyebrow">Kept this turn</div><div class="kept lost">${ks.map(k=>grp(k)).join('')}</div>`:''}
+        ${L.roll?`<div class="eyebrow">Last roll</div><div class="dice ${animate?'rolling':''}">${L.roll.map(v=>dieHTML(v,{dis:true})).join('')}</div>`:''}
         <div class="bigpts bad">0</div><div class="note">points this turn${L.lost?` · ${fmt(L.lost)} lost`:''}</div></section>`;
     }else tray=`<section class="tray">
       <div class="turnhead"><div class="who">${myTurn?'<b>Your turn</b>':`<b>${esc(nm(t.pid))}</b>'s turn`}</div><div class="tp"><small>Turn points</small>${fmt(t.total)}</div></div>
-      ${kept?`<div class="kept">${kept}</div>`:''}
-      ${dice}<div class="selinfo">${info}</div>${buttons}</section>`;
+      ${kept?`<div class="eyebrow">Kept this turn</div><div class="kept">${kept}</div>`:''}
+      ${t.phase==='choose'&&t.roll?'<div class="eyebrow">Rolled</div>':''}${dice}<div class="selinfo">${info}</div>${buttons}</section>`;
   }
   app.innerHTML=`<div class="topbar"><div><div class="eyebrow">Table <span class="code">${esc(s.code)}</span> · ${finishText(s.opts)}</div><h2>Diez Mil</h2></div><div class="row">${back}</div></div>
   <div class="board">${board}</div>
